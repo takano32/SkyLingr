@@ -1,10 +1,13 @@
+#! /home/takano32/local/bin/python
+# -*- coding: utf-8 -*-
 #! /usr/bin/env python
 # -*- coding: utf-8 -*-
 # vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 import sys
 import os
 os.environ['DISPLAY'] = ":64"
-os.environ['XAUTHORITY'] = "/var/www/.Xauthority"
+# os.environ['XAUTHORITY'] = "/var/www/.Xauthority"
+os.environ['XAUTHORITY'] = "/home/takano32/.Xauthority"
 
 import json
 import re
@@ -69,4 +72,3 @@ print
 exit()
 # for debug
 #print pp.pformat(from_lingr)
-
