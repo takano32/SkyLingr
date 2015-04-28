@@ -1,74 +1,74 @@
-#! /home/takano32/local/bin/python
 # -*- coding: utf-8 -*-
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
-# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
-import sys
+from bottle import post, run, request, response
+import re
+import json
+
 import os
 os.environ['DISPLAY'] = ":64"
-# os.environ['XAUTHORITY'] = "/var/www/.Xauthority"
 os.environ['XAUTHORITY'] = "/home/takano32/.Xauthority"
 
-import json
-import re
-
-import pprint
-pp = pprint.PrettyPrinter(indent = 4)
-
-import Skype4Py
-
 from configobj import ConfigObj
+global config
 config_path = '/home/takano32/workspace/skype-bridge/Skype4Py/skype-bridge.conf'
 config = ConfigObj(config_path)
 
-if not os.environ.has_key('CONTENT_LENGTH'):
-    exit()
-
-content_length = int(os.environ['CONTENT_LENGTH'])
-request_content = sys.stdin.read(content_length)
-
-from_lingr = json.JSONDecoder().decode(request_content)
-
-print "Content-Type: text/plain"
-print
-
-if not from_lingr.has_key('events'):
-    print
-    exit()
 
 def handler(msg, event):
     pass
 
-def send_message(room, text):
-    room.SendMessage(text)
-
+import Skype4Py
+global skype
 skype = Skype4Py.Skype()
 skype.OnMessageStatus = handler
 skype.Attach()
 
-for event in from_lingr['events']:
-    if not event.has_key('message'):
-        continue
+
+def send_message(room, text):
+    room.SendMessage(text)
+
+
+def event_handler(event):
+    if not('message' in event):
+        return
     for key in config:
         if key == 'lingr' or key == 'skype' or key == 'irc':
             continue
-        if not config[key].has_key('lingr'):
+        if not('lingr' in config[key]):
             continue
-        if not config[key].has_key('skype'):
+        if not('skype' in config[key]):
             continue
-        if event['message']['room'] == config[key]['lingr']:
-            text = event['message']['text']
-            name = event['message']['nickname']
-            if re.compile(u'荒.*?川.*?智.*?則').match(name):
-                name = event['message']['speaker_id']
-            if len(name) > 16:
-                name = event['message']['speaker_id']
-            room = config[key]['skype']
+        if not event['message']['room'] == config[key]['lingr']:
+            continue
+        event_handler_each(event, key)
+
+
+def event_handler_each(event, key):
+        text = event['message']['text']
+        name = event['message']['nickname']
+        if re.compile(u'荒.*?川.*?智.*?則').match(name):
+            name = event['message']['speaker_id']
+        if len(name) > 16:
+            name = event['message']['speaker_id']
+        room = config[key]['skype']
+        try:
             room = skype.Chat(room)
-            for line in text.splitlines():
-                msg = '%s: %s' % (name, line)
-                send_message(room, msg)
-print
-exit()
-# for debug
-#print pp.pformat(from_lingr)
+        except Skype4Py.SkypeError:
+            return
+        for line in text.splitlines():
+            msg = '%s: %s' % (name, line)
+            send_message(room, msg)
+
+
+@post('/skype')
+def post_from_lingr():
+    body = request.body.read()
+    from_lingr = json.JSONDecoder().decode(body)
+    if not('events' in from_lingr):
+        response.status = 200
+        return
+    for event in from_lingr['events']:
+        event_handler(event)
+    response.status = 200
+    return
+
+run(host='0.0.0.0', port=8006)
